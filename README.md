@@ -1,603 +1,239 @@
-Yeah bro, I see the issue. The content is **too much like a documentation dump**. A good GitHub README should have a strong visual header, badges, concise sections, tables, and clear navigation—not look like a long paper.
+<div align="center">
 
-I’d make it look more like this:
-
-````markdown
 # 📡 Adaptive RF Modulation Classification
 
-<p align="center">
-  <b>Adaptive RF Modulation Classification Using Residual Denoising and Raw–Denoised Signal Fusion with Residual CNN–Transformer–Attention Learning</b>
-</p>
+**Residual denoising + raw–denoised signal fusion + Residual CNN–Transformer–Attention**
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Conference-ICCIS%202026-blue" />
-  <img src="https://img.shields.io/badge/Status-Accepted%20%26%20Presented-success" />
-  <img src="https://img.shields.io/badge/Framework-PyTorch-orange" />
-  <img src="https://img.shields.io/badge/Dataset-RadioML%202016.10a-purple" />
-</p>
+![Conference](https://img.shields.io/badge/ICCIS-2026-blue)
+![Status](https://img.shields.io/badge/Paper-Accepted%20%26%20Presented-success)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
+![Dataset](https://img.shields.io/badge/Dataset-RadioML%202016.10a-purple)
+![Accuracy](https://img.shields.io/badge/Accuracy-87.20%25-brightgreen)
+
+[Overview](#-overview) · [Architecture](#-architecture) · [Results](#-results) · [Quick Start](#-quick-start) · [Paper](#-publication) · [Citation](#-citation)
+
+</div>
 
 ---
 
 ## 📌 Overview
 
-**Automatic Modulation Classification (AMC)** is the task of identifying the modulation scheme of an RF signal automatically.
+Automatic Modulation Classification (AMC) identifies the modulation scheme of an RF signal without prior knowledge. At low SNR, noise destroys the features classifiers rely on, and hard denoising also throws away useful signal.
 
-This project proposes an adaptive RF modulation classification framework that combines:
+This project's approach:
 
-- 🧹 **Residual Denoising Autoencoder (RDAE)**
-- 🔀 **Raw–Denoised Signal Fusion**
-- 🧠 **Residual 1D CNN**
-- 🔭 **Transformer Encoder**
-- 🎯 **Attention Mechanism**
-- 📡 **SNR Feature Branch**
+1. **Denoise** the signal with a Residual Denoising Autoencoder (RDAE).
+2. **Fuse** the denoised signal with the original raw signal, so no information is lost.
+3. **Classify** with a Residual 1D CNN → Transformer → Attention network, with a dedicated SNR branch.
 
-The main idea is to first reduce the effect of noise, preserve useful information from the original raw signal, and then perform robust modulation classification using a CNN–Transformer–Attention architecture.
+### Highlights
 
----
-
-## 🏆 Research Publication
-
-### 📄 Paper
-
-**Adaptive RF Modulation Classification Using Residual Denoising and Raw–Denoised Signal Fusion with Residual CNN–Transformer–Attention Learning**
-
-| | Details |
+| | |
 |---|---|
-| **Paper ID** | 925 |
-| **Author** | Akula Monish Ram |
-| **Affiliation** | Lovely Professional University |
-| **Conference** | ICCIS 2026 |
-| **Venue** | BITS Pilani, K K Birla Goa Campus |
-| **Date** | September 26–27, 2026 |
-| **Status** | ✅ Accepted & Presented |
-
-> **Status:** The paper has been accepted and presented at ICCIS 2026. The proceedings publication is currently pending.
+| 🎯 **Accuracy** | **87.20%** on RadioML 2016.10a (SNR ≥ −8 dB) |
+| 🧹 **Denoising** | Residual correction: `X_den = X_raw + R(X_raw)` |
+| 🔀 **Fusion** | `X_fused = 0.40·X_den + 0.60·X_raw` |
+| ⚡ **Speed** | 5.75 ms/frame (~174 frames/s) |
+| 🪶 **Size** | ~1.69M trainable parameters |
 
 ---
 
-## 🧠 Proposed Architecture
+## 🧠 Architecture
 
-```text
-                 CLEAN RF SIGNAL
-                        │
-                        ▼
-                    Add AWGN
-                        │
-                        ▼
-                 NOISY / RAW SIGNAL
-                        │
-                        ▼
-               ┌─────────────────┐
-               │      RDAE       │
-               │                 │
-               │ Encoder Stem    │
-               │       ↓         │
-               │ 3 Encoder       │
-               │ Residual Blocks │
-               │       ↓         │
-               │ Bottleneck      │
-               │       ↓         │
-               │ 2 Decoder       │
-               │ Residual Blocks │
-               │       ↓         │
-               │ Residual Head   │
-               └────────┬────────┘
-                        │
-                        ▼
-             Xdenoised = Xraw + R(Xraw)
-                        │
-                 ┌──────┴──────┐
-                 │             │
-                 ▼             ▼
-             RAW SIGNAL    DENOISED
-                 │             │
-                 └──────┬──────┘
-                        ▼
-                 WEIGHTED FUSION
-                        │
-                        ▼
-        Xfused = 0.40 Xdenoised + 0.60 Xraw
-                        │
-                        ▼
-                 FINAL 4 × 128
-                        │
-                        ▼
-             ┌─────────────────────┐
-             │   RESIDUAL 1D CNN   │
-             │                     │
-             │  CNN Block 1        │
-             │       ↓             │
-             │  CNN Block 2        │
-             │       ↓             │
-             │  CNN Block 3        │
-             └─────────┬───────────┘
-                       │
-                       ▼
-              Transformer Encoder 1
-                       │
-                       ▼
-              Transformer Encoder 2
-                       │
-                       ▼
-                   Attention
-                       │
-                       ├──────► SNR Branch
-                       │
-                       ▼
-                Feature Fusion
-                       │
-                       ▼
-                   Classifier
-                       │
-                       ▼
-             11 Modulation Classes
-````
-
----
-
-# 🔬 Methodology
-
-## 1. Noise Generation
-
-The clean RF signal is corrupted using **Additive White Gaussian Noise (AWGN)**:
-
-$$
-X_{raw}=X_{clean}+N_{AWGN}
-$$
-
-The clean signal is retained as the target for the denoising stage.
-
----
-
-## 2. Residual Denoising Autoencoder
-
-The RDAE learns a residual correction rather than reconstructing the entire clean signal from scratch:
-
-$$
-X_{denoised}=X_{raw}+R(X_{raw})
-$$
-
-### RDAE structure
-
-```text
-Encoder Stem
-     ↓
-3 Residual Encoder Blocks
-     ↓
-1 Residual Bottleneck
-     ↓
-Upsampling
-     ↓
-2 Residual Decoder Blocks
-     ↓
-Residual Head
+```mermaid
+flowchart TD
+    A[Clean IQ signal] -->|+ AWGN| B[Raw signal 2×128]
+    B --> C[RDAE<br/>6 residual blocks]
+    C --> D[Denoised signal]
+    B --> E[Weighted fusion<br/>0.40 den + 0.60 raw]
+    D --> E
+    B --> F[Concat → 4×128 input]
+    E --> F
+    F --> G[Residual 1D CNN<br/>3 blocks → 256-d]
+    G --> H[Transformer Encoder ×2<br/>8 heads, d=256]
+    H --> I[Attention pooling]
+    J[SNR] --> K[SNR branch → 32-d]
+    I --> L[Concat 288-d]
+    K --> L
+    L --> M[MLP classifier]
+    M --> N[11 modulation classes]
 ```
 
-**Total residual blocks: 6**
+<details>
+<summary><b>🔬 Component details (click to expand)</b></summary>
 
-* 3 Encoder
-* 1 Bottleneck
-* 2 Decoder
+### 1. Noise model
+$$X_{raw} = X_{clean} + N_{AWGN}$$
 
-The residual connection allows the original signal to be preserved while the network learns the required correction.
+### 2. Residual Denoising Autoencoder (RDAE)
+The network learns a *correction* instead of reconstructing the signal from scratch:
 
----
+$$X_{denoised} = X_{raw} + R(X_{raw})$$
 
-## 3. Raw–Denoised Fusion
+Encoder stem → 3 residual encoder blocks → residual bottleneck → upsampling → 2 residual decoder blocks → residual head (6 residual blocks total).
 
-The denoised signal is not used alone.
+### 3. Raw–denoised fusion
+$$X_{fused} = 0.40\,X_{denoised} + 0.60\,X_{raw}$$
 
-Instead:
+The classifier input stacks raw (2×128) and fused (2×128) into a **4×128** tensor.
 
-$$
-X_{fused}=0.40X_{denoised}+0.60X_{raw}
-$$
+### 4. Residual 1D CNN
 
-This preserves information from both representations.
+| Block | In → Out | Kernel | Dropout |
+|---|---|---:|---:|
+| CNN 1 | 4 → 64 | 7 | 0.15 |
+| CNN 2 | 64 → 128 | 5 | 0.20 |
+| CNN 3 | 128 → 256 | 3 | 0.25 |
 
-```text
-Raw Signal       → 60%
-Denoised Signal  → 40%
-                   ↓
-                Fusion
-```
+Two Conv1D layers per block, 2 max-pooling layers, 256-d output.
 
-The final classifier input is:
+### 5. Transformer encoder
 
-```text
-Raw Signal      → 2 × 128
-Fused Signal    → 2 × 128
-                      ↓
-                4 × 128 Input
-```
+| Parameter | Value |
+|---|---:|
+| Blocks | 2 |
+| Embedding dim | 256 |
+| Heads (dim/head) | 8 (32) |
+| Feed-forward dim | 512 |
+| Dropout | 0.25 |
 
----
+### 6. Attention pooling
+`Linear 256→128 → Tanh → Linear 128→1 → Softmax → weighted sum` → 256-d context vector.
 
-## 4. Residual 1D CNN
+### 7. SNR branch and classifier
+- SNR: `Linear 1→16 → ReLU → Linear 16→32`
+- Fusion: 256 + 32 = **288-d**
+- Head: `288 → 256 → 128 → 11` with ReLU and dropout (0.40, 0.30)
 
-The classifier contains **3 Residual 1D CNN blocks**.
-
-| Block       | Input | Output | Kernel | Dropout |
-| ----------- | ----: | -----: | -----: | ------: |
-| CNN Block 1 |     4 |     64 |      7 |    0.15 |
-| CNN Block 2 |    64 |    128 |      5 |    0.20 |
-| CNN Block 3 |   128 |    256 |      3 |    0.25 |
-
-Each block contains **2 Conv1D layers**.
-
-### CNN Summary
-
-* **3 Residual CNN blocks**
-* **6 Conv1D layers**
-* **2 Max-Pooling layers**
-* Final feature dimension: **256**
+</details>
 
 ---
 
-## 5. Transformer Encoder
+## 📊 Dataset
 
-The CNN features are passed to **2 Transformer Encoder blocks**.
+**RadioML 2016.10a** (not included in this repo; download separately).
 
-| Parameter              |    Value |
-| ---------------------- | -------: |
-| Encoder Blocks         |    **2** |
-| Embedding Dimension    |  **256** |
-| Attention Heads        |    **8** |
-| Dimension / Head       |   **32** |
-| Feed-Forward Dimension |  **512** |
-| Dropout                | **0.25** |
-
-The CNN captures local RF patterns, while the Transformer captures relationships across the learned sequence representation.
+| Property | Value |
+|---|---|
+| Samples | 220,000 |
+| Classes | 11 modulations |
+| Signal length | 128 I/Q samples |
+| SNR range | −20 to +18 dB |
+| Evaluated on | SNR ≥ −8 dB |
 
 ---
 
-## 6. Attention
+## 📈 Results
 
-A custom attention layer converts the Transformer output into a **256-dimensional context vector**.
+| Metric | Value |
+|---|---:|
+| **Accuracy** | **87.20%** |
+| Macro Precision / Recall / F1 | 0.89 / 0.87 / 0.87 |
+| Weighted F1 | 0.87 |
+| Parameters | ~1.69M |
+| Inference | 5.75 ms/frame |
 
-```text
-256
- ↓
-Linear 256 → 128
- ↓
-Tanh
- ↓
-Linear 128 → 1
- ↓
-Softmax
- ↓
-Weighted Aggregation
- ↓
-256-D Context Vector
-```
+### Ablation
 
----
+| Model | Accuracy |
+|---|---:|
+| Baseline CNN | 74.10% |
+| CNN–BiLSTM–Attention | 81.42% |
+| CNN–BiLSTM–Attention + Fusion | 86.63% |
+| **Residual CNN–Transformer + Fusion (proposed)** | **87.20%** |
 
-## 7. SNR Branch
-
-The SNR value is processed separately:
-
-```text
-SNR
- ↓
-Linear 1 → 16
- ↓
-ReLU
- ↓
-Linear 16 → 32
- ↓
-32-D SNR Features
-```
-
-The attention representation and SNR representation are combined:
-
-$$
-256+32=288
-$$
+Fusion alone adds **+5.2 points** to the BiLSTM baseline, and the proposed backbone adds a further **+0.6**.
 
 ---
 
-## 8. Final Classifier
+## ⚙️ Training Setup
 
-```text
-288
- ↓
-Linear → 256
- ↓
-ReLU
- ↓
-Dropout 0.40
- ↓
-Linear → 128
- ↓
-ReLU
- ↓
-Dropout 0.30
- ↓
-Linear → 11
- ↓
-Modulation Prediction
-```
+| | |
+|---|---|
+| Optimizer | AdamW (lr `5e-4`, weight decay `1e-4`) |
+| Batch size / epochs | 256 / 50 |
+| Scheduler | ReduceLROnPlateau |
+| Precision | AMP + GradScaler |
+| Hardware | Google Colab, NVIDIA Tesla T4 |
+| Stack | PyTorch, NumPy, Pandas, scikit-learn, Matplotlib |
 
 ---
 
-# 📊 Dataset
-
-The experiments use **RadioML 2016.10a**.
-
-| Property           |             Value |
-| ------------------ | ----------------: |
-| Samples            |       **220,000** |
-| Modulation Classes |            **11** |
-| Samples / Signal   |           **128** |
-| Representation     |           **I/Q** |
-| SNR Range          | **−20 to +18 dB** |
-| Experimental Focus |   **SNR ≥ −8 dB** |
-
-The dataset is **not included in this repository**.
-
----
-
-# ⚙️ Training
-
-### Framework
-
-* Python
-* PyTorch
-* NumPy
-* Pandas
-* Scikit-learn
-* Matplotlib
-* Jupyter Notebook
-
-### Hardware
-
-**Google Colab — NVIDIA Tesla T4**
-
-### Configuration
-
-| Parameter        |             Value |
-| ---------------- | ----------------: |
-| Optimizer        |             AdamW |
-| Learning Rate    |            `5e-4` |
-| Batch Size       |             `256` |
-| Epochs           |              `50` |
-| Weight Decay     |            `1e-4` |
-| Mixed Precision  |               AMP |
-| Gradient Scaling |        GradScaler |
-| Scheduler        | ReduceLROnPlateau |
-
----
-
-# 📈 Results
-
-## Main Performance
-
-| Metric                   |              Result |
-| ------------------------ | ------------------: |
-| **Accuracy**             |          **87.20%** |
-| **Macro Precision**      |            **0.89** |
-| **Macro Recall**         |            **0.87** |
-| **Macro F1**             |            **0.87** |
-| **Weighted F1**          |            **0.87** |
-| **Trainable Parameters** |          **~1.69M** |
-| **Inference Time**       |   **5.75 ms/frame** |
-| **Approx. Throughput**   | **~174 frames/sec** |
-
----
-
-# 🧪 Ablation Study
-
-| Model                                          |   Accuracy |
-| ---------------------------------------------- | ---------: |
-| Baseline CNN                                   |     74.10% |
-| CNN–BiLSTM–Attention                           |     81.42% |
-| CNN–BiLSTM–Attention + Fusion                  |     86.63% |
-| **Proposed Residual CNN–Transformer + Fusion** | **87.20%** |
-
----
-
-# 🖼️ Results & Visualizations
-
-The repository contains the main experimental visualizations:
-
-```text
-results/
-│
-├── confusion_matrix.png
-├── accuracy_vs_snr.png
-├── denoising_results.png
-└── ablation_results.png
-```
-
-### Confusion Matrix
-
-Classification performance across the 11 modulation classes.
-
-### Accuracy vs SNR
-
-Model performance across different SNR levels.
-
-### Denoising Results
-
-Comparison of clean, noisy, and reconstructed RF signals.
-
-### Ablation Results
-
-Performance comparison between different model configurations.
-
----
-
-# 📁 Repository Structure
-
-```text
-Adaptive-RF-Modulation-Classification/
-│
-├── 📄 README.md
-├── 📓 RF_Modulation_Classification.ipynb
-├── 📄 ICCIS_2026_Final_Manuscript_Paper_925.pdf
-│
-├── 📊 results/
-│   ├── confusion_matrix.png
-│   ├── accuracy_vs_snr.png
-│   ├── denoising_results.png
-│   └── ablation_results.png
-│
-└── 📦 requirements.txt
-```
-
----
-
-# 🚀 Getting Started
-
-### 1. Clone the repository
+## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/Monish-Ram250/Adaptive-RF-Modulation-Classification.git
 cd Adaptive-RF-Modulation-Classification
-```
-
-### 2. Install dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. Prepare the dataset
+1. Download **RadioML 2016.10a** and set the dataset path in the first cells of `RF_Modulation_Classification.ipynb`.
+2. Run the notebook top to bottom.
 
-Download/obtain **RadioML 2016.10a** separately.
+---
 
-The dataset is not included in this repository.
-
-Configure the dataset path in:
+## 📁 Repository Structure
 
 ```text
-RF_Modulation_Classification.ipynb
-```
-
-### 4. Run the notebook
-
-Open:
-
-```text
-RF_Modulation_Classification.ipynb
-```
-
-and execute the cells in order.
-
----
-
-# ⚠️ Limitations
-
-The current study primarily evaluates the model under AWGN-based noise conditions.
-
-The following aspects are not fully evaluated:
-
-* Rayleigh fading
-* Other wireless channel models
-* Frequency offsets
-* Phase offsets
-* Hardware impairments
-* Over-the-air RF testing
-* SDR hardware validation
-* Additional RF datasets
-
----
-
-# 🔮 Future Work
-
-Future extensions include:
-
-* 🌐 Rayleigh and other fading-channel evaluation
-* 📡 Software Defined Radio (SDR) validation
-* 📶 Over-the-air testing
-* 🔧 Hardware impairment modeling
-* 🧪 Hardware-in-the-loop experiments
-* 📊 Evaluation on additional RF datasets
-* ⚡ Model compression and quantization
-* 🚀 Deployment on resource-constrained hardware
-* 📡 Real-world RF signal evaluation
-
----
-
-# 📄 Conference Presentation
-
-### ICCIS 2026
-
-**8th International Conference on Communication and Intelligent Systems**
-
-📍 **BITS Pilani, K K Birla Goa Campus**
-📅 **September 26–27, 2026**
-📄 **Paper ID: 925**
-
-### Status
-
-```text
-✅ Paper Submitted
-✅ Paper Accepted
-✅ Camera-Ready Submitted
-✅ Conference Presentation Completed
-⏳ Proceedings Publication Pending
+├── RF_Modulation_Classification.ipynb   # full pipeline: data, RDAE, classifier, eval
+├── ICCIS_2026_Final_Manuscript_Paper_925.pdf
+└── requirements.txt
 ```
 
 ---
 
-# 📑 Manuscript
+## ⚠️ Limitations & Future Work
 
-The final manuscript submitted for the conference is included in this repository:
+Evaluation is currently limited to **AWGN** on a single dataset. Not yet covered:
 
-**`ICCIS_2026_Final_Manuscript_Paper_925.pdf`**
-
-The manuscript contains the methodology, experiments, results, analysis, and conclusions of this research.
-
----
-
-# 👨‍💻 Author
-
-### Akula Monish Ram
-
-**B.Tech Computer Science & Engineering**
-**Lovely Professional University**
+- [ ] Rayleigh / other fading channels
+- [ ] Frequency and phase offsets, hardware impairments
+- [ ] SDR and over-the-air validation
+- [ ] Additional RF datasets
+- [ ] Model compression / quantization for edge deployment
 
 ---
 
-# 🙏 Acknowledgement
+## 📄 Publication
 
-I sincerely thank my research mentor and faculty members for their continuous guidance, support, and valuable feedback throughout this research work.
+**Adaptive RF Modulation Classification Using Residual Denoising and Raw–Denoised Signal Fusion with Residual CNN–Transformer–Attention Learning**
 
-I also thank the organizers of **ICCIS 2026** for providing the opportunity to present this research and engage in technical discussions with researchers and academicians.
+| | |
+|---|---|
+| Conference | ICCIS 2026, 8th International Conference on Communication and Intelligent Systems |
+| Venue | BITS Pilani, K K Birla Goa Campus |
+| Dates | September 26–27, 2026 |
+| Paper ID | 925 |
+| Status | ✅ Accepted & presented · ⏳ Proceedings pending |
 
 ---
 
-# 📚 Citation
+## 📚 Citation
 
-If you reference this work, please cite:
-
-```text
-Akula Monish Ram,
-"Adaptive RF Modulation Classification Using Residual Denoising
-and Raw–Denoised Signal Fusion with Residual CNN–Transformer–
-Attention Learning,"
-ICCIS 2026, Paper ID 925.
+```bibtex
+@inproceedings{ram2026adaptive,
+  author    = {Akula Monish Ram},
+  title     = {Adaptive RF Modulation Classification Using Residual Denoising and
+               Raw--Denoised Signal Fusion with Residual CNN--Transformer--Attention Learning},
+  booktitle = {Proc. 8th International Conference on Communication and Intelligent Systems (ICCIS)},
+  year      = {2026},
+  note      = {Paper ID 925}
+}
 ```
 
 ---
 
-## ⭐ Keywords
+## 👨‍💻 Author
 
-`Automatic Modulation Classification` · `RF Signal Processing` · `RDAE` · `Residual Denoising` · `Raw-Denoised Fusion` · `1D CNN` · `Residual CNN` · `Transformer` · `Attention` · `SNR` · `RadioML 2016.10a` · `Deep Learning` · `Wireless Communication`
+**Akula Monish Ram**: B.Tech CSE, Lovely Professional University
+[GitHub](https://github.com/Monish-Ram250)
 
----
+## 🙏 Acknowledgement
 
-<p align="center">
-  <b>Accepted & Presented at ICCIS 2026</b>
-</p>
+Thanks to my research mentor and faculty for their guidance, and to the ICCIS 2026 organizers for the opportunity to present.
 
-<p align="center">
-  ⭐ If you find this research useful, consider starring the repository.
-</p>
-```
+<div align="center">
 
-This will look **much more like an actual GitHub README**: strong header → badges → project explanation → architecture → methodology → results → repository structure → setup → publication → author.
+⭐ If you find this useful, consider starring the repo.
 
-I also kept the conference status consistent with your current situation: **accepted + presented, proceedings pending**, rather than calling the paper published. 
+</div>
